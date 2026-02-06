@@ -14,9 +14,17 @@ function runPodman(args) {
   });
 }
 
+var APP_LABEL = 'com.urban-octo-umbrella.managed=true';
+
 router.get('/', async function(req, res) {
   try {
-    var stdout = await runPodman(['ps', '--format', 'json']);
+    var stdout = await runPodman([
+      'ps',
+      '--filter',
+      'label=com.urban-octo-umbrella.managed=true',
+      '--format',
+      'json'
+    ]);
     var containers = JSON.parse(stdout || '[]');
     var normalized = containers.map(function(container) {
       return {
@@ -45,6 +53,8 @@ router.post('/', async function(req, res) {
       '-d',
       '--name',
       name,
+      '--label',
+      APP_LABEL,
       '--pull=missing',
       'docker.io/library/alpine:latest',
       'sleep',

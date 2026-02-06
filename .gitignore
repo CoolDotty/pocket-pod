@@ -45,3 +45,6 @@ coverage/
 dist/
 build/
 out/
+
+# ---- Safety ----
+.env
