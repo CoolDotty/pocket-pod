@@ -22,7 +22,6 @@ var frontendDevUrl = process.env.FRONTEND_DEV_URL || ('http://' + domainName + '
 var frontendProxy = null;
 var githubClientId = process.env.GITHUB_CLIENT_ID;
 var githubClientSecret = process.env.GITHUB_CLIENT_SECRET;
-var githubCallbackUrl = process.env.GITHUB_CALLBACK_URL;
 if (!githubCallbackUrl && !isProd) {
   githubCallbackUrl = 'http://' + domainName + ':3000/auth/github/callback';
 }
@@ -30,9 +29,6 @@ if (!githubCallbackUrl && !isProd) {
 if (!authDisabled) {
   if (!githubClientId || !githubClientSecret) {
     throw new Error('Missing GITHUB_CLIENT_ID or GITHUB_CLIENT_SECRET');
-  }
-  if (isProd && !githubCallbackUrl) {
-    throw new Error('Missing GITHUB_CALLBACK_URL in production');
   }
 }
 

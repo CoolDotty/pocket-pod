@@ -10,7 +10,6 @@ Required:
 - `SESSION_SECRET`
 
 Optional:
-- `GITHUB_CALLBACK_URL` (required in production)
 - `NO_AUTH=true` (dev-only escape hatch to skip auth)
 - `DOMAIN_NAME` (base domain used for dev callback + SSH host, default `localhost`)
 - `FRONTEND_DEV_URL` (dev-only override for Vite URL, default `http://<DOMAIN_NAME>:5173`)
@@ -21,7 +20,7 @@ Optional:
 2. Create a new OAuth App.
 3. Set the Authorization callback URL:
    - Dev: `http://<DOMAIN_NAME>:3000/auth/github/callback`
-   - Prod: your backend URL, then set `GITHUB_CALLBACK_URL`
+   - Prod: your actual domain
 
 ### Example `backend/.env`
 
@@ -30,7 +29,6 @@ GITHUB_CLIENT_ID=your_client_id
 GITHUB_CLIENT_SECRET=your_client_secret
 SESSION_SECRET=some_long_random_string
 DOMAIN_NAME=localhost
-# GITHUB_CALLBACK_URL=https://your-domain.com/auth/github/callback
 # NO_AUTH=true
 # FRONTEND_DEV_URL=http://localhost:5173
 ```
