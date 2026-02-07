@@ -17,13 +17,14 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 var isProd = app.get('env') === 'production';
 var authDisabled = String(process.env.NO_AUTH || '').toLowerCase() === 'true';
-var frontendDevUrl = process.env.FRONTEND_DEV_URL || 'http://localhost:5173';
+var domainName = process.env.DOMAIN_NAME || 'localhost';
+var frontendDevUrl = process.env.FRONTEND_DEV_URL || ('http://' + domainName + ':5173');
 var frontendProxy = null;
 var githubClientId = process.env.GITHUB_CLIENT_ID;
 var githubClientSecret = process.env.GITHUB_CLIENT_SECRET;
 var githubCallbackUrl = process.env.GITHUB_CALLBACK_URL;
 if (!githubCallbackUrl && !isProd) {
-  githubCallbackUrl = 'http://localhost:3000/auth/github/callback';
+  githubCallbackUrl = 'http://' + domainName + ':3000/auth/github/callback';
 }
 
 if (!authDisabled) {
@@ -62,9 +63,11 @@ if (!isProd) {
 app.use(session({
   secret: process.env.SESSION_SECRET || 'dev-session-secret',
   resave: false,
+  rolling: true,
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
+    maxAge: 60 * 60 * 1000,
     sameSite: 'lax',
     secure: isProd
   }
@@ -90,7 +93,8 @@ if (!authDisabled) {
     return done(null, {
       id: profile.id,
       username: profile.username,
-      displayName: profile.displayName
+      displayName: profile.displayName,
+      accessToken: accessToken
     });
   }));
 }
@@ -110,7 +114,7 @@ app.get('/auth/github', function(req, res, next) {
   if (authDisabled) {
     return res.redirect('/');
   }
-  return passport.authenticate('github', { scope: ['read:user'] })(req, res, next);
+  return passport.authenticate('github', { scope: ['read:user', 'repo'] })(req, res, next);
 });
 
 app.get('/auth/github/callback', function(req, res, next) {
@@ -141,7 +145,15 @@ app.get('/api/me', function(req, res) {
     return res.json({ ok: true, user: { id: 'dev', username: 'dev', displayName: 'Dev User' } });
   }
   if (req.isAuthenticated && req.isAuthenticated()) {
-    return res.json({ ok: true, user: req.user });
+    var user = req.user || {};
+    return res.json({
+      ok: true,
+      user: {
+        id: user.id,
+        username: user.username,
+        displayName: user.displayName
+      }
+    });
   }
   return res.status(401).json({ ok: false, error: 'Not authenticated' });
 });

@@ -27,6 +27,28 @@
   flex-wrap: wrap;
 }
 
+.repo-input {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 260px;
+}
+
+.repo-input__label {
+  font-size: 0.75rem;
+  letter-spacing: 0.12rem;
+  text-transform: uppercase;
+  color: #7a8899;
+}
+
+.repo-input__field {
+  padding: 0.65rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid #c9d2e1;
+  background: #ffffff;
+  min-width: 280px;
+}
+
 .user-pill {
   padding: 0.5rem 1rem;
   border-radius: 999px;
@@ -83,6 +105,12 @@
   border-radius: 16px;
   background: #f6f7fb;
   border: 1px solid #e5e7f2;
+}
+
+.card__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .card__title {
@@ -154,9 +182,21 @@ button:disabled {
     align-items: flex-start;
   }
 
+  .repo-input,
+  .repo-input__field {
+    width: 100%;
+    min-width: 0;
+  }
+
   .card {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .card__actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .primary,

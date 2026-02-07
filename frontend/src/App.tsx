@@ -8,6 +8,13 @@ type Container = {
   image?: string
   status?: string
   createdAt?: string
+  ssh?: {
+    host?: string
+    port?: string
+    user?: string
+    password?: string
+    vscodeUri?: string
+  } | null
 }
 
 type User = { username?: string; displayName?: string }
@@ -36,6 +43,25 @@ function useAuth() {
     loadUser()
   }, [])
 
+  useEffect(() => {
+    if (!authChecked) {
+      return
+    }
+    const intervalMs = 5 * 60 * 1000
+    const tick = () => {
+      loadUser()
+    }
+    const intervalId = window.setInterval(tick, intervalMs)
+    const handleVisibility = () => {
+      loadUser()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      window.clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [authChecked])
+
   return { user, authChecked, reload: loadUser }
 }
 
@@ -44,6 +70,7 @@ function Dashboard({ user }: { user: User }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [repoUrl, setRepoUrl] = useState('')
 
   const loadContainers = async () => {
     setLoading(true)
@@ -70,7 +97,14 @@ function Dashboard({ user }: { user: User }) {
     setBusyId('create')
     setError(null)
     try {
-      const response = await fetch('/api/containers', { method: 'POST' })
+      const trimmedRepoUrl = repoUrl.trim()
+      const response = await fetch('/api/containers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(trimmedRepoUrl ? { repoUrl: trimmedRepoUrl } : {})
+      })
       const data = await response.json()
       if (!response.ok || !data.ok) {
         throw new Error(data?.error || 'Failed to create container')
@@ -111,6 +145,19 @@ function Dashboard({ user }: { user: User }) {
           </p>
         </div>
         <div className="header__actions">
+          <div className="repo-input">
+            <label htmlFor="repo-url" className="repo-input__label">
+              GitHub Repo URL (optional)
+            </label>
+            <input
+              id="repo-url"
+              className="repo-input__field"
+              type="text"
+              placeholder="https://github.com/org/repo.git"
+              value={repoUrl}
+              onChange={(event) => setRepoUrl(event.target.value)}
+            />
+          </div>
           <div className="user-pill">{user.displayName || user.username || 'Signed in'}</div>
           <button className="primary" onClick={handleCreate} disabled={busyId === 'create'}>
             {busyId === 'create' ? 'Starting...' : 'Run New Container'}
@@ -144,14 +191,29 @@ function Dashboard({ user }: { user: User }) {
                   {container.createdAt ? (
                     <p className="card__meta">Created: {container.createdAt}</p>
                   ) : null}
+                  {container.ssh?.vscodeUri ? (
+                    <p className="card__meta">
+                      SSH: {container.ssh.user}@{container.ssh.host}:{container.ssh.port}
+                    </p>
+                  ) : null}
+                  {container.ssh?.password ? (
+                    <p className="card__meta">Password: {container.ssh.password}</p>
+                  ) : null}
                 </div>
-                <button
-                  className="danger"
-                  onClick={() => handleDelete(container.id)}
-                  disabled={busyId === container.id}
-                >
-                  {busyId === container.id ? 'Deleting...' : 'Delete'}
-                </button>
+                <div className="card__actions">
+                  {container.ssh?.vscodeUri ? (
+                    <a className="ghost link-button" href={container.ssh.vscodeUri}>
+                      Open in VS Code
+                    </a>
+                  ) : null}
+                  <button
+                    className="danger"
+                    onClick={() => handleDelete(container.id)}
+                    disabled={busyId === container.id}
+                  >
+                    {busyId === container.id ? 'Deleting...' : 'Delete'}
+                  </button>
+                </div>
               </div>
             ))}
           </div>

@@ -1,0 +1,10 @@
+{
+  "name": "urban-octo-umbrella",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "remoteUser": "node",
+  "containerUser": "node",
+  "postCreateCommand": "command -v pnpm >/dev/null 2>&1 || (corepack enable && corepack prepare pnpm@latest --activate); pnpm install"
+}
