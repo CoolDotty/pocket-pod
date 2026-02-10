@@ -1,4 +1,4 @@
-# dev-in-a-box
+# pocket-pod
 
 Single-binary PocketBase + Go backend with a React (Vite) frontend.
 
