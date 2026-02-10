@@ -1,47 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-
-type User = {
-  id: string;
-  email: string;
-  role: string;
-  display_name: string;
-};
-
-type SignupConfig = {
-  requiresInvite: boolean;
-  userCount: number;
-};
-
-async function fetchJson<T>(input: RequestInfo, init?: RequestInit) {
-  const response = await fetch(input, {
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
-    ...init,
-  });
-
-  if (!response.ok) {
-    let message = `${response.status} ${response.statusText}`;
-    try {
-      const data = (await response.json()) as { message?: string };
-      if (data?.message) {
-        message = data.message;
-      }
-    } catch {
-      // ignore json parse errors
-    }
-    throw new Error(message);
-  }
-
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return (await response.json()) as T;
-}
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import DashboardPage from "./pages/Dashboard";
+import LoginPage from "./pages/Login";
+import SignupPage from "./pages/Signup";
+import { fetchJson } from "./lib/fetchJson";
+import type { SignupConfig, User } from "./types/auth";
 
 export default function App() {
-  const [path, setPath] = useState(() => window.location.pathname);
   const [user, setUser] = useState<User | null>(null);
   const [signupConfig, setSignupConfig] = useState<SignupConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,10 +20,8 @@ export default function App() {
   const [inviteToken, setInviteToken] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const requiresInvite = useMemo(
-    () => signupConfig?.requiresInvite ?? false,
-    [signupConfig],
-  );
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const loadSession = async () => {
     setLoading(true);
@@ -86,18 +50,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const handlePop = () => setPath(window.location.pathname);
-    window.addEventListener("popstate", handlePop);
-    return () => window.removeEventListener("popstate", handlePop);
-  }, []);
-
-  const navigate = (nextPath: string) => {
-    if (nextPath === path) {
-      return;
-    }
-    window.history.pushState({}, "", nextPath);
-    setPath(nextPath);
-  };
+    setError(null);
+  }, [location.pathname]);
 
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -111,6 +65,7 @@ export default function App() {
       });
       setUser(data);
       setLoginPassword("");
+      navigate("/dashboard", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -137,6 +92,7 @@ export default function App() {
       setSignupPassword("");
       setSignupPasswordConfirm("");
       setInviteToken("");
+      navigate("/dashboard", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Signup failed");
     } finally {
@@ -151,6 +107,7 @@ export default function App() {
     try {
       await fetchJson<void>("/auth/logout", { method: "POST" });
       setUser(null);
+      navigate("/login", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Logout failed");
     } finally {
@@ -169,135 +126,62 @@ export default function App() {
         </p>
       </header>
 
-      <section className="card auth-card">
-        <h2>Authentication</h2>
-        {loading ? (
-          <p className="muted">Loading session...</p>
-        ) : user ? (
-          <div className="auth-state">
-            <p className="muted">Signed in</p>
-            <div className="auth-details">
-              <div>
-                <strong>{user.display_name || user.email}</strong>
-                <div className="muted">{user.email}</div>
-              </div>
-              <span className="pill">{user.role}</span>
-            </div>
-            <button
-              className="button outline"
-              type="button"
-              onClick={handleLogout}
-              disabled={submitting}
-            >
-              Log out
-            </button>
-          </div>
-        ) : path === "/signup" ? (
-          <div className="auth-forms">
-            <form className="auth-form" onSubmit={handleSignup}>
-              <h3>Sign up</h3>
-              <label>
-                Email
-                <input
-                  type="email"
-                  value={signupEmail}
-                  onChange={(event) => setSignupEmail(event.target.value)}
-                  autoComplete="email"
-                  required
-                />
-              </label>
-              <label>
-                Password
-                <input
-                  type="password"
-                  value={signupPassword}
-                  onChange={(event) => setSignupPassword(event.target.value)}
-                  autoComplete="new-password"
-                  required
-                />
-              </label>
-              <label>
-                Confirm password
-                <input
-                  type="password"
-                  value={signupPasswordConfirm}
-                  onChange={(event) =>
-                    setSignupPasswordConfirm(event.target.value)
-                  }
-                  autoComplete="new-password"
-                  required
-                />
-              </label>
-              {requiresInvite ? (
-                <label>
-                  Invite token
-                  <input
-                    type="text"
-                    value={inviteToken}
-                    onChange={(event) => setInviteToken(event.target.value)}
-                    required
-                  />
-                </label>
-              ) : (
-                <p className="muted">
-                  First user signup is open. Subsequent signups require an
-                  invite token.
-                </p>
-              )}
-              <button className="button" type="submit" disabled={submitting}>
-                Create account
-              </button>
-              <button
-                className="button outline"
-                type="button"
-                onClick={() => navigate("/")}
-                disabled={submitting}
-              >
-                Back to login
-              </button>
-            </form>
-          </div>
-        ) : (
-          <div className="auth-forms">
-            <form className="auth-form" onSubmit={handleLogin}>
-              <h3>Log in</h3>
-              <label>
-                Email
-                <input
-                  type="email"
-                  value={loginEmail}
-                  onChange={(event) => setLoginEmail(event.target.value)}
-                  autoComplete="email"
-                  required
-                />
-              </label>
-              <label>
-                Password
-                <input
-                  type="password"
-                  value={loginPassword}
-                  onChange={(event) => setLoginPassword(event.target.value)}
-                  autoComplete="current-password"
-                  required
-                />
-              </label>
-              <button className="button" type="submit" disabled={submitting}>
-                Log in
-              </button>
-              <button
-                className="button outline"
-                type="button"
-                onClick={() => navigate("/signup")}
-                disabled={submitting}
-              >
-                Create account
-              </button>
-            </form>
-          </div>
-        )}
-
-        {error ? <p className="error">{error}</p> : null}
-      </section>
+      <Routes>
+        <Route
+          path="/"
+          element={<Navigate to={user ? "/dashboard" : "/login"} replace />}
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <DashboardPage
+              user={user}
+              loading={loading}
+              submitting={submitting}
+              error={error}
+              onLogout={handleLogout}
+            />
+          }
+        />
+        <Route
+          path="/login"
+          element={
+            <LoginPage
+              user={user}
+              loading={loading}
+              error={error}
+              submitting={submitting}
+              loginEmail={loginEmail}
+              loginPassword={loginPassword}
+              onLogin={handleLogin}
+              setLoginEmail={setLoginEmail}
+              setLoginPassword={setLoginPassword}
+            />
+          }
+        />
+        <Route
+          path="/signup"
+          element={
+            <SignupPage
+              user={user}
+              loading={loading}
+              signupConfig={signupConfig}
+              error={error}
+              submitting={submitting}
+              signupEmail={signupEmail}
+              signupPassword={signupPassword}
+              signupPasswordConfirm={signupPasswordConfirm}
+              inviteToken={inviteToken}
+              onSignup={handleSignup}
+              setSignupEmail={setSignupEmail}
+              setSignupPassword={setSignupPassword}
+              setSignupPasswordConfirm={setSignupPasswordConfirm}
+              setInviteToken={setInviteToken}
+            />
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </div>
   );
 }
