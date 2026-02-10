@@ -1,4 +1,4 @@
-# urban-octo-umbrella
+# dev-in-a-box
 
 Single-binary PocketBase + Go backend with a React (Vite) frontend.
 
