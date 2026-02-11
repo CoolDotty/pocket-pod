@@ -25,6 +25,7 @@ func main() {
 		}
 
 		registerAuthRoutes(e.Router, app)
+		registerPodmanRoutes(e.Router)
 		if assets != nil {
 			registerStaticRoutes(e.Router, assets)
 		}

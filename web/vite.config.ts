@@ -14,6 +14,7 @@ export default defineConfig({
     proxy: {
       "/api": "http://localhost:8090",
       "/auth": "http://localhost:8090",
+      "/podman": "http://localhost:8090",
       "/_/": "http://localhost:8090",
     },
   },
