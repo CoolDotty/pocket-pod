@@ -31,6 +31,9 @@ build at compile time (`go:embed`) and serves it as an SPA with fallback routing
   cookie (`pb_auth`). A global middleware (`bindAuthCookieMiddleware`) copies the cookie
   into the `Authorization` header so PocketBase's built-in auth resolution populates
   `re.Auth` on every request.
+- **Regression note**: `bindAuthCookieMiddleware` must run **before** PocketBase's
+  `loadAuthToken` middleware. If its priority is too low, `re.Auth` won't populate on
+  refresh even though the `pb_auth` cookie is present.
 - Cookie security (Secure flag, TTL, domain) is configurable via environment variables:
   `AUTH_COOKIE_SECURE`, `AUTH_COOKIE_TTL_DAYS`, `AUTH_COOKIE_DOMAIN`.
 

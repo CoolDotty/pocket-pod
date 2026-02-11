@@ -5,19 +5,25 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tools/hook"
 	"github.com/pocketbase/pocketbase/tools/router"
 )
 
 func bindAuthCookieMiddleware(router *router.Router[*core.RequestEvent]) {
-	router.BindFunc(func(re *core.RequestEvent) error {
-		if re.Request.Header.Get("Authorization") == "" {
-			if cookie, err := re.Request.Cookie(authCookieName); err == nil && cookie.Value != "" {
-				re.Request.Header.Set("Authorization", "Bearer "+cookie.Value)
+	router.Bind(&hook.Handler[*core.RequestEvent]{
+		Id:       "bindAuthCookie",
+		Priority: apis.DefaultLoadAuthTokenMiddlewarePriority - 1,
+		Func: func(re *core.RequestEvent) error {
+			if re.Request.Header.Get("Authorization") == "" {
+				if cookie, err := re.Request.Cookie(authCookieName); err == nil && cookie.Value != "" {
+					re.Request.Header.Set("Authorization", "Bearer "+cookie.Value)
+				}
 			}
-		}
 
-		return re.Next()
+			return re.Next()
+		},
 	})
 }
 
