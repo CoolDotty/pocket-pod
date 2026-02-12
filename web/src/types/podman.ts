@@ -3,6 +3,9 @@ export type PodmanContainer = {
   name: string;
   image: string;
   status: string;
+  tunnelStatus?: "ready" | "starting" | "blocked" | "failed";
+  tunnelCode?: string;
+  tunnelMessage?: string;
   storageSize?: string;
   createdAt?: string;
   ports?: string;

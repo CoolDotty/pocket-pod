@@ -13,6 +13,18 @@ export type CreateWorkspaceResponse = {
   status: string;
   repoUrl: string;
   ref?: string;
+  tunnel: {
+    status: "ready" | "starting" | "blocked" | "failed";
+    code?: string;
+    message?: string;
+    debug?: {
+      version: string;
+      installCmd?: string;
+      startCmd?: string;
+      installOutput?: string;
+      startOutput?: string;
+    };
+  };
 };
 
 export type ContainerActionPayload = {

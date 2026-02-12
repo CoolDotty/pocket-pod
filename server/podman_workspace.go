@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -16,7 +18,8 @@ import (
 )
 
 const (
-	defaultWorkspaceImage = "mcr.microsoft.com/devcontainers/universal:latest"
+	defaultWorkspaceImage   = "docker.io/library/ubuntu:latest"
+	defaultWorkspaceCommand = "while true; do sleep 3600; done"
 
 	workspaceCreateFailedMessage = "Failed to create workspace container."
 	workspaceStartFailedMessage  = "Failed to start workspace container."
@@ -45,10 +48,11 @@ type createWorkspacePayload struct {
 }
 
 type createWorkspaceResponse struct {
-	Name    string `json:"name"`
-	Status  string `json:"status"`
-	RepoURL string `json:"repoUrl"`
-	Ref     string `json:"ref,omitempty"`
+	Name    string                  `json:"name"`
+	Status  string                  `json:"status"`
+	RepoURL string                  `json:"repoUrl"`
+	Ref     string                  `json:"ref,omitempty"`
+	Tunnel  workspaceTunnelSnapshot `json:"tunnel"`
 }
 
 type podmanInspectSummary struct {
@@ -80,7 +84,7 @@ func registerWorkspaceRoutes(rtr *router.Router[*core.RequestEvent], svc *podman
 			})
 		}
 
-		result, err := svc.createWorkspace(payload)
+		result, err := svc.createWorkspace(re.Auth.Id, payload)
 		if err != nil {
 			switch {
 			case errors.Is(err, errPodmanUnavailable):
@@ -108,15 +112,22 @@ func registerWorkspaceRoutes(rtr *router.Router[*core.RequestEvent], svc *podman
 
 var errWorkspaceStartFailed = errors.New("workspace start failed")
 
-func (s *podmanService) createWorkspace(payload createWorkspacePayload) (*createWorkspaceResponse, error) {
+func (s *podmanService) createWorkspace(userID string, payload createWorkspacePayload) (*createWorkspaceResponse, error) {
 	if _, err := exec.LookPath("podman"); err != nil {
 		return nil, errPodmanUnavailable
 	}
+
+	volumeHostPath, err := ensureWorkspaceVSCodeVolumePath(userID)
+	if err != nil {
+		return nil, err
+	}
+	vscodeMountArg := formatWorkspaceVSCodeMountArg(volumeHostPath)
 
 	args := []string{"create", "--pull=missing"}
 	if payload.Name != "" {
 		args = append(args, "--name", payload.Name)
 	}
+	args = append(args, "--mount", vscodeMountArg)
 
 	keys := make([]string, 0, len(payload.Env))
 	for key := range payload.Env {
@@ -132,7 +143,7 @@ func (s *podmanService) createWorkspace(payload createWorkspacePayload) (*create
 		args = append(args, "--label", fmt.Sprintf("pocketpod.ref=%s", payload.Ref))
 	}
 
-	args = append(args, defaultWorkspaceImage)
+	args = append(args, defaultWorkspaceImage, "sh", "-lc", defaultWorkspaceCommand)
 
 	createCmd := exec.Command("podman", args...)
 	createOutput, createErr := createCmd.CombinedOutput()
@@ -165,14 +176,46 @@ func (s *podmanService) createWorkspace(payload createWorkspacePayload) (*create
 		status = "Running"
 	}
 
-	s.schedulePoll(podmanPollDebounce)
+	tunnelState := s.bootstrapTunnel(containerID, name)
+	if tunnelState.Status == "" {
+		tunnelState.Status = tunnelStatusStarting
+	}
+	if s.setTunnelState(containerID, tunnelState) {
+		s.schedulePoll(podmanPollDebounce)
+	}
+	if tunnelState.Status == tunnelStatusStarting {
+		go s.monitorTunnelState(containerID, volumeHostPath)
+	}
 
 	return &createWorkspaceResponse{
 		Name:    name,
 		Status:  status,
 		RepoURL: payload.RepoURL,
 		Ref:     payload.Ref,
+		Tunnel:  workspaceTunnelSnapshot(tunnelState),
 	}, nil
+}
+
+func ensureWorkspaceVSCodeVolumePath(userID string) (string, error) {
+	trimmedUserID := strings.TrimSpace(userID)
+	if trimmedUserID == "" {
+		return "", errors.New("missing user id")
+	}
+
+	volumeHostPath := filepath.Join(".", "volumes", trimmedUserID, ".vscode")
+	if err := os.MkdirAll(volumeHostPath, 0o755); err != nil {
+		return "", err
+	}
+	absolutePath, err := filepath.Abs(volumeHostPath)
+	if err != nil {
+		return "", err
+	}
+	return absolutePath, nil
+}
+
+func formatWorkspaceVSCodeMountArg(volumeHostPath string) string {
+	normalizedHostPath := filepath.ToSlash(strings.TrimSpace(volumeHostPath))
+	return fmt.Sprintf("type=bind,src=%s,dst=/root/.vscode", normalizedHostPath)
 }
 
 func validateCreateWorkspacePayload(payload *createWorkspacePayload) error {

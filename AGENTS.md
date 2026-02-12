@@ -81,3 +81,33 @@ managing containerized dev workspaces.
   defined as package-level vars and matched with `errors.Is()`.
 - **Migrations are self-contained**: The `migrations` package uses inline string literals
   (not the main package constants) since migrations are point-in-time snapshots.
+
+## Workspace + Tunnel Notes
+
+- Default workspace image is Ubuntu: `docker.io/library/ubuntu:latest`.
+- New workspace containers must mount user-scoped VS Code state:
+  - Host: `./volumes/{userId}/.vscode`
+  - Container: `/root/.vscode`
+  - Use bind mount args via `--mount type=bind,...` with absolute host path.
+- `./volumes/` must remain gitignored.
+- Keepalive command for default workspace is:
+  - `sh -lc "while true; do sleep 3600; done"`
+- Tunnel bootstrap runs during workspace creation:
+  - Install VS Code CLI only if `code` is not already installed.
+  - Use direct download URLs:
+    - x64: `https://code.visualstudio.com/sha/download?build=stable&os=cli-alpine-x64`
+    - arm32: `https://code.visualstudio.com/sha/download?build=stable&os=cli-linux-armhf`
+    - arm64: `https://code.visualstudio.com/sha/download?build=stable&os=cli-linux-arm64`
+- Tunnel logging paths in container:
+  - Bootstrap: `/tmp/pocketpod-vscode-bootstrap.log`
+  - Tunnel runtime: `/tmp/pocketpod-vscode-tunnel.log`
+- Tunnel auth URL is constant:
+  - `https://github.com/login/device`
+- Container tunnel state is exposed via `/podman/containers` and `/podman/containers/stream`:
+  - `tunnelStatus`, `tunnelCode`, `tunnelMessage`
+- Create workspace response includes tunnel snapshot:
+  - `tunnel: { status, code?, message?, debug? }`
+- Tunnel readiness rule:
+  - Prefer runtime process check (`code tunnel` running) for `ready`.
+  - Auth/device-code prompts from tunnel logs must surface as `blocked`.
+  - Existing containers (created before current server run) must also be reconciled from logs.

@@ -136,9 +136,13 @@ func (s *podmanService) poll() {
 	}
 
 	normalizeContainers(containers)
-	hash := hashContainers(containers)
+	discoveredTunnelStates := discoverTunnelStatesForContainers(containers)
 
 	s.mu.Lock()
+	mergeTunnelStateMap(s.tunnelStateByContainerID, discoveredTunnelStates)
+	pruneTunnelStateMap(s.tunnelStateByContainerID, containers)
+	enrichContainersWithTunnelState(containers, s.tunnelStateByContainerID)
+	hash := hashContainers(containers)
 	changed := s.hash != hash || s.errMessage != ""
 	stored := make([]podmanContainer, len(containers))
 	copy(stored, containers)
@@ -205,6 +209,7 @@ func (s *podmanService) applyEvent(raw string) bool {
 	}
 
 	normalizeContainers(s.containers)
+	enrichContainersWithTunnelState(s.containers, s.tunnelStateByContainerID)
 	s.hash = hashContainers(s.containers)
 	result := make([]podmanContainer, len(s.containers))
 	copy(result, s.containers)
@@ -226,6 +231,12 @@ func (s *podmanService) applyEvent(raw string) bool {
 func (s *podmanService) removeContainerLocked(event podmanEvent) bool {
 	for i := len(s.containers) - 1; i >= 0; i-- {
 		if matchesPodmanEvent(s.containers[i], event) {
+			removedID := strings.TrimSpace(s.containers[i].ID)
+			for key := range s.tunnelStateByContainerID {
+				if isContainerIDMatch(key, removedID) {
+					delete(s.tunnelStateByContainerID, key)
+				}
+			}
 			s.containers = append(s.containers[:i], s.containers[i+1:]...)
 			return true
 		}

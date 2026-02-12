@@ -50,14 +50,17 @@ var podmanStreamEventAllowlist = map[string]struct{}{
 }
 
 type podmanContainer struct {
-	ID          string            `json:"id"`
-	Name        string            `json:"name"`
-	Image       string            `json:"image"`
-	Status      string            `json:"status"`
-	StorageSize string            `json:"storageSize,omitempty"`
-	CreatedAt   string            `json:"createdAt,omitempty"`
-	Ports       string            `json:"ports,omitempty"`
-	Labels      map[string]string `json:"labels,omitempty"`
+	ID            string            `json:"id"`
+	Name          string            `json:"name"`
+	Image         string            `json:"image"`
+	Status        string            `json:"status"`
+	StorageSize   string            `json:"storageSize,omitempty"`
+	CreatedAt     string            `json:"createdAt,omitempty"`
+	Ports         string            `json:"ports,omitempty"`
+	Labels        map[string]string `json:"labels,omitempty"`
+	TunnelStatus  string            `json:"tunnelStatus,omitempty"`
+	TunnelCode    string            `json:"tunnelCode,omitempty"`
+	TunnelMessage string            `json:"tunnelMessage,omitempty"`
 }
 
 type podmanStreamMessage struct {
@@ -75,11 +78,12 @@ type podmanEvent struct {
 }
 
 type podmanService struct {
-	mu          sync.RWMutex
-	containers  []podmanContainer
-	hash        uint64
-	errMessage  string
-	initialized bool
+	mu                       sync.RWMutex
+	containers               []podmanContainer
+	tunnelStateByContainerID map[string]podmanTunnelState
+	hash                     uint64
+	errMessage               string
+	initialized              bool
 
 	hubMu   sync.Mutex
 	clients map[*podmanClient]struct{}
@@ -97,9 +101,10 @@ type podmanClient struct {
 
 func newPodmanService() *podmanService {
 	return &podmanService{
-		containers: []podmanContainer{},
-		clients:    make(map[*podmanClient]struct{}),
-		pollCh:     make(chan time.Duration, 1),
+		containers:               []podmanContainer{},
+		tunnelStateByContainerID: make(map[string]podmanTunnelState),
+		clients:                  make(map[*podmanClient]struct{}),
+		pollCh:                   make(chan time.Duration, 1),
 	}
 }
 
@@ -148,6 +153,10 @@ func (s *podmanService) getCachedContainers() ([]podmanContainer, string) {
 	}
 
 	normalizeContainers(containers)
+	discoveredTunnelStates := discoverTunnelStatesForContainers(containers)
+	mergeTunnelStateMap(s.tunnelStateByContainerID, discoveredTunnelStates)
+	pruneTunnelStateMap(s.tunnelStateByContainerID, containers)
+	enrichContainersWithTunnelState(containers, s.tunnelStateByContainerID)
 	s.hash = hashContainers(containers)
 	stored := make([]podmanContainer, len(containers))
 	copy(stored, containers)

@@ -48,3 +48,4 @@ pb_migrations/
 pocketbase
 pocketbase.exe
 *.pb
+volumes/

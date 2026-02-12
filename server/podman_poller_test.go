@@ -31,3 +31,29 @@ func TestShouldUpdateContainerStatusFromEvent(t *testing.T) {
 		t.Fatal("start should update status")
 	}
 }
+
+func TestRemoveContainerLockedClearsTunnelState(t *testing.T) {
+	svc := newPodmanService()
+	svc.containers = []podmanContainer{
+		{ID: "abc123", Name: "ws-one"},
+	}
+	svc.tunnelStateByContainerID["abc123"] = podmanTunnelState{
+		Status: tunnelStatusBlocked,
+		Code:   "ABCD-EFGH",
+	}
+
+	removed := svc.removeContainerLocked(podmanEvent{
+		ID:   "abc123",
+		Name: "ws-one",
+	})
+	if !removed {
+		t.Fatal("expected container removal")
+	}
+
+	if len(svc.containers) != 0 {
+		t.Fatal("expected container list to be empty")
+	}
+	if _, exists := svc.tunnelStateByContainerID["abc123"]; exists {
+		t.Fatal("expected tunnel state cleanup for removed container")
+	}
+}

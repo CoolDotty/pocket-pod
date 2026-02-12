@@ -118,6 +118,9 @@ func hashContainers(containers []podmanContainer) uint64 {
 		writeHashField(hasher, container.StorageSize)
 		writeHashField(hasher, container.CreatedAt)
 		writeHashField(hasher, container.Ports)
+		writeHashField(hasher, container.TunnelStatus)
+		writeHashField(hasher, container.TunnelCode)
+		writeHashField(hasher, container.TunnelMessage)
 
 		if len(container.Labels) > 0 {
 			keys := make([]string, 0, len(container.Labels))

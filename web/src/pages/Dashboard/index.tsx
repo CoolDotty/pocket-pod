@@ -86,6 +86,9 @@ export default function DashboardPage() {
   const containerErrorMessage = containersError
     ? getPodmanContainersErrorMessage(containersError)
     : null;
+  const blockedContainer = containers.find(
+    (container) => container.tunnelStatus === "blocked",
+  );
 
   if (!user) {
     return null;
@@ -185,6 +188,35 @@ export default function DashboardPage() {
           <p className="error">{containerActionError}</p>
         ) : null}
         {streamError ? <p className="error">{streamError}</p> : null}
+        {blockedContainer ? (
+          <div className={styles.tunnelBanner}>
+            <strong>VS Code tunnel login required</strong>
+            <span>
+              Container:{" "}
+              {blockedContainer.name ||
+                (blockedContainer.id
+                  ? blockedContainer.id.slice(0, 12)
+                  : "Unknown")}
+            </span>
+            <span>
+              Open{" "}
+              <a
+                href="https://github.com/login/device"
+                target="_blank"
+                rel="noreferrer"
+              >
+                https://github.com/login/device
+              </a>
+            </span>
+            {blockedContainer.tunnelCode ? (
+              <span>
+                Code: <code>{blockedContainer.tunnelCode}</code>
+              </span>
+            ) : (
+              <span>Code pending. Check container tunnel logs.</span>
+            )}
+          </div>
+        ) : null}
         {!containersLoading &&
         !containerErrorMessage &&
         containers.length === 0 ? (
