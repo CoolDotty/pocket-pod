@@ -1,3 +1,5 @@
+make sure you run `npm run lint` when finalizing changes
+
 # Project Structure
 
 ```text
