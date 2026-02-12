@@ -3,6 +3,7 @@ export type PodmanContainer = {
   name: string;
   image: string;
   status: string;
+  storageSize?: string;
   createdAt?: string;
   ports?: string;
   labels?: Record<string, string>;

@@ -6,12 +6,14 @@ import {
   getPodmanContainersErrorMessage,
   usePodmanContainersQuery,
 } from "@/api/podmanQueries";
+import { usePodmanContainersStream } from "@/api/podmanStream";
 import styles from "./Dashboard.module.css";
 
 export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const { user, setUser } = useAuth();
   const { getLogoutErrorMessage } = useAuthError(setError);
+  const { streamError } = usePodmanContainersStream(Boolean(user));
   const {
     data: containers = [],
     isLoading: containersLoading,
@@ -31,7 +33,6 @@ export default function DashboardPage() {
     ? getPodmanContainersErrorMessage(containersError)
     : null;
 
-
   return (
     <section className={styles.card}>
       <h2>Dashboard</h2>
@@ -45,7 +46,7 @@ export default function DashboardPage() {
       </div>
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
-          <h3>Running containers</h3>
+          <h3>Containers</h3>
           <button
             className="button outline"
             type="button"
@@ -61,10 +62,11 @@ export default function DashboardPage() {
         {containerErrorMessage ? (
           <p className="error">{containerErrorMessage}</p>
         ) : null}
+        {streamError ? <p className="error">{streamError}</p> : null}
         {!containersLoading &&
         !containerErrorMessage &&
         containers.length === 0 ? (
-          <p className="muted">No running containers found.</p>
+          <p className="muted">No containers found.</p>
         ) : null}
         {!containersLoading &&
         !containerErrorMessage &&
@@ -84,7 +86,7 @@ export default function DashboardPage() {
                       <div className="muted">{container.image}</div>
                     </div>
                     <span className={styles.statusPill}>
-                      {container.status || "Running"}
+                      {container.status || "Unknown"}
                     </span>
                   </div>
                   <div className={styles.containerMeta}>
@@ -93,6 +95,9 @@ export default function DashboardPage() {
                     ) : null}
                     {container.ports ? (
                       <span>Ports: {container.ports}</span>
+                    ) : null}
+                    {container.storageSize ? (
+                      <span>Storage: {container.storageSize}</span>
                     ) : null}
                   </div>
                 </div>
