@@ -87,7 +87,8 @@ managing containerized dev workspaces.
 - Default workspace image is Ubuntu: `docker.io/library/ubuntu:latest`.
 - New workspace containers must mount user-scoped VS Code state:
   - Host: `./volumes/{userId}/.vscode`
-  - Container: `/root/.vscode`
+  - Container: `{firstNonRootUserHome}/.vscode` (derived from image `/etc/passwd`)
+  - Fallback container path: `/root/.vscode` only if no non-root user can be resolved
   - Use bind mount args via `--mount type=bind,...` with absolute host path.
 - `./volumes/` must remain gitignored.
 - Keepalive command for default workspace is:
@@ -104,10 +105,17 @@ managing containerized dev workspaces.
 - Tunnel auth URL is constant:
   - `https://github.com/login/device`
 - Container tunnel state is exposed via `/podman/containers` and `/podman/containers/stream`:
-  - `tunnelStatus`, `tunnelCode`, `tunnelMessage`
+  - `tunnelStatus`, `tunnelCode`, `tunnelMessage`, `tunnelUrl`
 - Create workspace response includes tunnel snapshot:
   - `tunnel: { status, code?, message?, debug? }`
 - Tunnel readiness rule:
   - Prefer runtime process check (`code tunnel` running) for `ready`.
   - Auth/device-code prompts from tunnel logs must surface as `blocked`.
+  - If the **latest non-empty** tunnel log line is:
+    - `To grant access to the server, please log into https://github.com/login/device and use code ...`
+    then status must remain `blocked`.
+  - Tunnel connect URL must only be emitted/displayed when `tunnelStatus == ready` (not `starting`).
+  - Connect URL format is `https://vscode.dev/tunnel/{sanitized-container-name}`.
+  - The tunnel process must run as the first non-root user from `/etc/passwd`, not root.
+  - Ensure `/tmp/pocketpod-vscode-tunnel.log` is writable by that non-root user before starting tunnel.
   - Existing containers (created before current server run) must also be reconciled from logs.

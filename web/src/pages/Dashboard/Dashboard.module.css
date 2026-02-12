@@ -102,6 +102,19 @@
   color: #6b7280;
 }
 
+.tunnelLinkRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.6rem;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.tunnelLinkRow a {
+  color: #1d4ed8;
+  word-break: break-all;
+}
+
 .containerActions {
   display: flex;
   gap: 0.6rem;

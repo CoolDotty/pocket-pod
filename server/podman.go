@@ -61,6 +61,7 @@ type podmanContainer struct {
 	TunnelStatus  string            `json:"tunnelStatus,omitempty"`
 	TunnelCode    string            `json:"tunnelCode,omitempty"`
 	TunnelMessage string            `json:"tunnelMessage,omitempty"`
+	TunnelURL     string            `json:"tunnelUrl,omitempty"`
 }
 
 type podmanStreamMessage struct {

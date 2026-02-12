@@ -30,6 +30,7 @@ const (
 var (
 	deviceCodePattern = regexp.MustCompile(`(?i)\b(?:enter\s+(?:the\s+)?)?(?:device\s*code|code)\b[^A-Z0-9-]*([A-Z0-9]{4}(?:-[A-Z0-9]{4})+)`)
 	invalidTunnelName = regexp.MustCompile(`[^a-zA-Z0-9_.-]`)
+	authPromptLinePattern = regexp.MustCompile(`^To grant access to the server, please log into https://github\.com/login/device and use code [A-Za-z0-9-]+$`)
 )
 
 type podmanTunnelState struct {
@@ -318,6 +319,13 @@ func (s *podmanService) monitorTunnelState(containerID string, hostVSCodeDir str
 }
 
 func evaluateTunnelState(logOutput string, tokenPresent bool, logErr error, tunnelRunning bool) (podmanTunnelState, bool) {
+	if isLatestTunnelLogLineAuthPrompt(logOutput) {
+		return podmanTunnelState{
+			Status:  tunnelStatusBlocked,
+			Message: tunnelAuthRequiredMessage,
+		}, true
+	}
+
 	if state, ok := deriveTunnelStateFromLog(logOutput); ok {
 		if state.Status == tunnelStatusBlocked || state.Status == tunnelStatusFailed {
 			return state, true
@@ -341,6 +349,25 @@ func evaluateTunnelState(logOutput string, tokenPresent bool, logErr error, tunn
 	}
 
 	return podmanTunnelState{Status: tunnelStatusStarting}, false
+}
+
+func isLatestTunnelLogLineAuthPrompt(logOutput string) bool {
+	line := latestNonEmptyLine(logOutput)
+	if line == "" {
+		return false
+	}
+	return authPromptLinePattern.MatchString(line)
+}
+
+func latestNonEmptyLine(value string) string {
+	lines := strings.Split(value, "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(lines[i])
+		if line != "" {
+			return line
+		}
+	}
+	return ""
 }
 
 func deriveTunnelStateFromLog(logOutput string) (podmanTunnelState, bool) {
@@ -599,12 +626,26 @@ func enrichContainersWithTunnelState(containers []podmanContainer, tunnelStateBy
 			containers[i].TunnelStatus = ""
 			containers[i].TunnelCode = ""
 			containers[i].TunnelMessage = ""
+			containers[i].TunnelURL = ""
 			continue
 		}
 		containers[i].TunnelStatus = state.Status
 		containers[i].TunnelCode = state.Code
 		containers[i].TunnelMessage = state.Message
+		containers[i].TunnelURL = buildTunnelConnectURLForContainer(containers[i].Name, state.Status)
 	}
+}
+
+func buildTunnelConnectURLForContainer(containerName string, tunnelStatus string) string {
+	status := strings.TrimSpace(strings.ToLower(tunnelStatus))
+	if status != tunnelStatusReady {
+		return ""
+	}
+	name := buildTunnelName(containerName, "")
+	if name == "" {
+		return ""
+	}
+	return "https://vscode.dev/tunnel/" + name
 }
 
 func pruneTunnelStateMap(tunnelStateByContainerID map[string]podmanTunnelState, containers []podmanContainer) {

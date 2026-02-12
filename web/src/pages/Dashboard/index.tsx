@@ -356,6 +356,18 @@ export default function DashboardPage() {
                       <span>Storage: {container.storageSize}</span>
                     ) : null}
                   </div>
+                  {container.tunnelStatus === "ready" && container.tunnelUrl ? (
+                    <div className={styles.tunnelLinkRow}>
+                      <span className="muted">VS Code Tunnel:</span>
+                      <a
+                        href={container.tunnelUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {container.tunnelUrl}
+                      </a>
+                    </div>
+                  ) : null}
                 </div>
               );
             })}

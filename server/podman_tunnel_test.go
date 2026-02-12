@@ -93,6 +93,21 @@ func TestEvaluateTunnelStateReadyLineWithoutProcessRemainsStarting(t *testing.T)
 	}
 }
 
+func TestEvaluateTunnelStateBlockedWhenLatestLineIsAuthPrompt(t *testing.T) {
+	logOutput := strings.Join([]string{
+		"Open this link in your browser https://vscode.dev/tunnel/cool_ishizaka",
+		"To grant access to the server, please log into https://github.com/login/device and use code ABCD-EFGH",
+	}, "\n")
+
+	state, terminal := evaluateTunnelState(logOutput, false, nil, true)
+	if !terminal {
+		t.Fatal("expected terminal state")
+	}
+	if state.Status != tunnelStatusBlocked {
+		t.Fatalf("expected blocked status, got %q", state.Status)
+	}
+}
+
 func TestEnrichContainersWithTunnelState(t *testing.T) {
 	containers := []podmanContainer{{ID: "abc", Name: "one"}, {ID: "def", Name: "two"}}
 	states := map[string]podmanTunnelState{
@@ -109,6 +124,35 @@ func TestEnrichContainersWithTunnelState(t *testing.T) {
 	}
 	if containers[1].TunnelCode != "ZZZZ-9999" {
 		t.Fatalf("expected tunnel code merge, got %q", containers[1].TunnelCode)
+	}
+	if containers[1].TunnelURL != "" {
+		t.Fatalf("expected blocked tunnel to omit connect URL, got %q", containers[1].TunnelURL)
+	}
+}
+
+func TestEnrichContainersWithTunnelStateAddsConnectURLWhenNotBlocked(t *testing.T) {
+	containers := []podmanContainer{{ID: "abc", Name: "my-workspace"}}
+	states := map[string]podmanTunnelState{
+		"abc": {Status: tunnelStatusReady},
+	}
+
+	enrichContainersWithTunnelState(containers, states)
+
+	if containers[0].TunnelURL != "https://vscode.dev/tunnel/my-workspace" {
+		t.Fatalf("expected tunnel URL, got %q", containers[0].TunnelURL)
+	}
+}
+
+func TestEnrichContainersWithTunnelStateOmitsConnectURLWhileStarting(t *testing.T) {
+	containers := []podmanContainer{{ID: "abc", Name: "my-workspace"}}
+	states := map[string]podmanTunnelState{
+		"abc": {Status: tunnelStatusStarting},
+	}
+
+	enrichContainersWithTunnelState(containers, states)
+
+	if containers[0].TunnelURL != "" {
+		t.Fatalf("expected no tunnel URL while starting, got %q", containers[0].TunnelURL)
 	}
 }
 
