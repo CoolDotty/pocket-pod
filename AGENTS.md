@@ -24,7 +24,29 @@ make sure you run `npm run lint` when finalizing changes
 |   |-- migrations/
 |   |   \-- 20260210_auth.go   Creates users (auth) + invites collections
 |   \-- web/dist/         Frontend build output embedded in the Go binary
-|-- web/                  React (Vite) frontend (see "Web App Structure")
+|-- web/                  React (Vite) frontend
+|   |-- public/           Static public assets
+|   |-- src/
+|   |   |-- api/          PocketBase client + auth + podman queries/mutations/streaming
+|   |   |-- components/   Shared UI + route guards
+|   |   |-- context/      React context providers (Auth)
+|   |   |-- hooks/        Reusable hooks (auth error handling)
+|   |   |-- layouts/      App shell/layout components
+|   |   |-- pages/        Route-level screens
+|   |   |   |-- Dashboard/
+|   |   |   |-- Login/
+|   |   |   \-- Signup/
+|   |   |-- types/        Shared TypeScript types
+|   |   |-- App.tsx       App routes/composition
+|   |   |-- main.tsx      React entry point
+|   |   |-- index.css     Global styles
+|   |   \-- vite-env.d.ts Vite type declarations
+|   |-- index.html        Vite HTML entry
+|   |-- eslint.config.js  Frontend ESLint config
+|   |-- package.json      Frontend dependencies and scripts
+|   |-- tsconfig.json     Frontend TypeScript config
+|   |-- tsconfig.node.json Vite config TS support
+|   \-- vite.config.ts    Vite config (proxy + build output)
 |-- go.mod                Go module definition
 |-- package.json          Root scripts for dev/build
 |-- README.md             Project usage docs
@@ -59,31 +81,3 @@ managing containerized dev workspaces.
   defined as package-level vars and matched with `errors.Is()`.
 - **Migrations are self-contained**: The `migrations` package uses inline string literals
   (not the main package constants) since migrations are point-in-time snapshots.
-
-# Web App Structure
-
-```text
-web/
-|-- public/               Static public assets
-|-- src/
-|   |-- api/              PocketBase client + auth + podman queries/mutations/streaming
-|   |-- components/       Shared UI + route guards
-|   |-- context/          React context providers (Auth)
-|   |-- hooks/            Reusable hooks (auth error handling)
-|   |-- layouts/          App shell/layout components
-|   |-- pages/            Route-level screens
-|   |   |-- Dashboard/
-|   |   |-- Login/
-|   |   \-- Signup/
-|   |-- types/            Shared TypeScript types
-|   |-- App.tsx           App routes/composition
-|   |-- main.tsx          React entry point
-|   |-- index.css         Global styles
-|   \-- vite-env.d.ts     Vite type declarations
-|-- index.html            Vite HTML entry
-|-- eslint.config.js      Frontend ESLint config
-|-- package.json          Frontend dependencies and scripts
-|-- tsconfig.json         Frontend TypeScript config
-|-- tsconfig.node.json    Vite config TS support
-\-- vite.config.ts        Vite config (proxy + build output)
-```
