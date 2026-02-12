@@ -227,8 +227,10 @@ export default function DashboardPage() {
                 deleteContainerMutation.isPending;
               const statusText = (container.status || "").trim().toLowerCase();
               const canRun =
-                statusText.includes("stopped") ||
+                statusText === "stop" ||
+                statusText === "stopped" ||
                 statusText.includes("exited") ||
+                statusText === "create" ||
                 statusText.includes("created") ||
                 statusText === "configured";
               const actionsDisabled =

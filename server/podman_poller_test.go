@@ -31,12 +31,3 @@ func TestShouldUpdateContainerStatusFromEvent(t *testing.T) {
 		t.Fatal("start should update status")
 	}
 }
-
-func TestMapEventStatus(t *testing.T) {
-	if got := mapEventStatus("kill"); got != "Exited" {
-		t.Fatalf("mapEventStatus(kill) = %q, want Exited", got)
-	}
-	if got := mapEventStatus("exited"); got != "Exited" {
-		t.Fatalf("mapEventStatus(exited) = %q, want Exited", got)
-	}
-}

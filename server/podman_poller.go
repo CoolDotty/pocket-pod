@@ -173,16 +173,16 @@ func (s *podmanService) applyEvent(raw string) bool {
 		return false
 	}
 
-	status := strings.ToLower(strings.TrimSpace(event.Status))
-	if status == "" {
+	rawStatus := strings.TrimSpace(event.Status)
+	if rawStatus == "" {
 		return false
 	}
+	status := strings.ToLower(rawStatus)
 	if !isPodmanStreamEventAllowed(status) {
 		return false
 	}
 
 	isRemoval := status == "remove"
-	displayStatus := mapEventStatus(status)
 	shouldUpdateStatus := shouldUpdateContainerStatusFromEvent(status)
 
 	s.mu.Lock()
@@ -196,7 +196,7 @@ func (s *podmanService) applyEvent(raw string) bool {
 	if isRemoval {
 		changed = s.removeContainerLocked(event)
 	} else {
-		changed = s.upsertContainerLocked(event, displayStatus, shouldUpdateStatus)
+		changed = s.upsertContainerLocked(event, rawStatus, shouldUpdateStatus)
 	}
 
 	if !changed {
@@ -233,7 +233,7 @@ func (s *podmanService) removeContainerLocked(event podmanEvent) bool {
 	return false
 }
 
-func (s *podmanService) upsertContainerLocked(event podmanEvent, displayStatus string, shouldUpdateStatus bool) bool {
+func (s *podmanService) upsertContainerLocked(event podmanEvent, status string, shouldUpdateStatus bool) bool {
 	for i := range s.containers {
 		if matchesPodmanEvent(s.containers[i], event) {
 			changed := false
@@ -249,8 +249,8 @@ func (s *podmanService) upsertContainerLocked(event podmanEvent, displayStatus s
 				s.containers[i].ID = event.ID
 				changed = true
 			}
-			if shouldUpdateStatus && s.containers[i].Status != displayStatus {
-				s.containers[i].Status = displayStatus
+			if shouldUpdateStatus && s.containers[i].Status != status {
+				s.containers[i].Status = status
 				changed = true
 			}
 			return changed
@@ -261,7 +261,7 @@ func (s *podmanService) upsertContainerLocked(event podmanEvent, displayStatus s
 		ID:     event.ID,
 		Name:   event.Name,
 		Image:  event.Image,
-		Status: displayStatus,
+		Status: status,
 	})
 	return true
 }
@@ -286,30 +286,6 @@ func matchesPodmanEvent(container podmanContainer, event podmanEvent) bool {
 	}
 
 	return false
-}
-
-func mapEventStatus(status string) string {
-	switch status {
-	case "start":
-		return "Running"
-	case "stop":
-		return "Stopped"
-	case "died", "kill", "exited":
-		return "Exited"
-	case "pause":
-		return "Paused"
-	case "unpause":
-		return "Running"
-	case "create":
-		return "Created"
-	case "restart":
-		return "Restarting"
-	default:
-		if len(status) == 0 {
-			return "Unknown"
-		}
-		return strings.ToUpper(status[:1]) + status[1:]
-	}
 }
 
 func isPodmanStreamEventAllowed(status string) bool {
