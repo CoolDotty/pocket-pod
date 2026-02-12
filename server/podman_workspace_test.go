@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestValidateCreateWorkspacePayloadMinimalValid(t *testing.T) {
 	payload := createWorkspacePayload{
@@ -79,5 +82,32 @@ func TestIsPodmanNameConflict(t *testing.T) {
 	}
 	if isPodmanNameConflict([]byte("Error: image not found")) {
 		t.Fatal("did not expect unrelated error to match conflict")
+	}
+}
+
+func TestDeriveWorkspaceVSCodeMountTargetFromPasswd(t *testing.T) {
+	passwd := strings.Join([]string{
+		"root:x:0:0:root:/root:/bin/bash",
+		"ubuntu:x:1000:1000:ubuntu:/home/ubuntu:/bin/bash",
+	}, "\n")
+
+	target := deriveWorkspaceVSCodeMountTargetFromPasswd(passwd)
+	if target != "/home/ubuntu/.vscode" {
+		t.Fatalf("expected ubuntu vscode dir, got %q", target)
+	}
+}
+
+func TestDeriveWorkspaceVSCodeMountTargetFromPasswdFallsBackToRoot(t *testing.T) {
+	passwd := "root:x:0:0:root:/root:/bin/bash"
+	target := deriveWorkspaceVSCodeMountTargetFromPasswd(passwd)
+	if target != defaultVSCodeMountPath {
+		t.Fatalf("expected default mount path, got %q", target)
+	}
+}
+
+func TestFormatWorkspaceVSCodeMountArgUsesTarget(t *testing.T) {
+	mountArg := formatWorkspaceVSCodeMountArg("C:/work/volumes/user/.vscode", "/home/ubuntu/.vscode")
+	if !strings.Contains(mountArg, "dst=/home/ubuntu/.vscode") {
+		t.Fatalf("expected target mount path, got %q", mountArg)
 	}
 }

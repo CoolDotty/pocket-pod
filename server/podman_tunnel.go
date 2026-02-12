@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -47,6 +48,7 @@ type workspaceTunnelSnapshot struct {
 
 type workspaceTunnelDebug struct {
 	Version       string `json:"version"`
+	ExecUser      string `json:"execUser,omitempty"`
 	InstallCmd    string `json:"installCmd,omitempty"`
 	StartCmd      string `json:"startCmd,omitempty"`
 	InstallOutput string `json:"installOutput,omitempty"`
@@ -54,10 +56,19 @@ type workspaceTunnelDebug struct {
 }
 
 func (s *podmanService) bootstrapTunnel(containerID string, workspaceName string) podmanTunnelState {
+	execUser, err := resolveFirstNonRootUser(containerID)
+	if err != nil {
+		return podmanTunnelState{
+			Status:  tunnelStatusFailed,
+			Message: "No non-root user found in container.",
+		}
+	}
+
 	installCommand := buildVSCodeInstallCommand()
-	startCommand := buildTunnelStartCommand(buildTunnelName(workspaceName, containerID))
+	startCommand := buildTunnelStartCommand(buildTunnelName(workspaceName, containerID), execUser.Home)
 	debug := &workspaceTunnelDebug{
 		Version:    "tunnel-debug-v1",
+		ExecUser:   execUser.Name,
 		InstallCmd: installCommand,
 		StartCmd:   startCommand,
 	}
@@ -70,7 +81,7 @@ func (s *podmanService) bootstrapTunnel(containerID string, workspaceName string
 		}
 	}
 
-	_, _ = runPodmanCommand("exec", containerID, "sh", "-lc", "mkdir -p /tmp && : > "+tunnelLogPath+" && : > "+tunnelBootstrapLogPath)
+	_, _ = runPodmanCommand("exec", containerID, "sh", "-lc", buildTunnelLogPrepareCommand(execUser.Name))
 
 	installOutput, installErr := runPodmanCommand(
 		"exec",
@@ -88,7 +99,7 @@ func (s *podmanService) bootstrapTunnel(containerID string, workspaceName string
 		}
 	}
 
-	startOutput, startErr := runPodmanCommand("exec", "-d", containerID, "sh", "-lc", startCommand)
+	startOutput, startErr := runPodmanCommand("exec", "-d", "--user", execUser.Name, containerID, "sh", "-lc", startCommand)
 	debug.StartOutput = firstNonEmptyLine(string(startOutput))
 	if startErr != nil {
 		return podmanTunnelState{
@@ -102,6 +113,83 @@ func (s *podmanService) bootstrapTunnel(containerID string, workspaceName string
 		Status: tunnelStatusStarting,
 		Debug:  debug,
 	}
+}
+
+func buildTunnelLogPrepareCommand(execUser string) string {
+	trimmedUser := strings.TrimSpace(execUser)
+	if trimmedUser == "" {
+		return "mkdir -p /tmp && : > " + tunnelLogPath + " && : > " + tunnelBootstrapLogPath
+	}
+	return fmt.Sprintf(
+		"mkdir -p /tmp && : > %s && : > %s && chown %s %s",
+		tunnelLogPath,
+		tunnelBootstrapLogPath,
+		shellSingleQuote(trimmedUser),
+		tunnelLogPath,
+	)
+}
+
+type tunnelExecUser struct {
+	Name string
+	Home string
+}
+
+func resolveFirstNonRootUser(containerID string) (tunnelExecUser, error) {
+	output, err := runPodmanCommand("exec", containerID, "sh", "-lc", "cat /etc/passwd 2>/dev/null || true")
+	if err != nil {
+		return tunnelExecUser{}, err
+	}
+	name, home, ok := selectFirstNonRootUser(string(output))
+	if !ok {
+		return tunnelExecUser{}, errors.New("no non-root user")
+	}
+	return tunnelExecUser{Name: name, Home: home}, nil
+}
+
+func selectFirstNonRootUser(passwdContents string) (string, string, bool) {
+	fallbackName := ""
+	fallbackHome := ""
+
+	for _, line := range strings.Split(passwdContents, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+
+		parts := strings.Split(trimmed, ":")
+		if len(parts) < 7 {
+			continue
+		}
+
+		name := strings.TrimSpace(parts[0])
+		if name == "" || name == "root" {
+			continue
+		}
+
+		uid, err := strconv.Atoi(strings.TrimSpace(parts[2]))
+		if err != nil {
+			continue
+		}
+		home := strings.TrimSpace(parts[5])
+		if home == "" {
+			home = "/tmp"
+		}
+
+		if fallbackName == "" {
+			fallbackName = name
+			fallbackHome = home
+		}
+
+		if uid >= 1000 && strings.HasPrefix(home, "/home/") {
+			return name, home, true
+		}
+	}
+
+	if fallbackName == "" {
+		return "", "", false
+	}
+
+	return fallbackName, fallbackHome, true
 }
 
 func buildVSCodeInstallCommand() string {
@@ -133,12 +221,21 @@ func buildVSCodeInstallCommand() string {
 	}, "\n")
 }
 
-func buildTunnelStartCommand(tunnelName string) string {
+func buildTunnelStartCommand(tunnelName string, homeDir string) string {
 	safeName := shellSingleQuote(tunnelName)
+	home := strings.TrimSpace(homeDir)
+	if home == "" {
+		home = "/tmp"
+	}
+	dataDir := strings.TrimRight(home, "/") + "/.vscode"
+	safeHome := shellSingleQuote(home)
+	safeDataDir := shellSingleQuote(dataDir)
 	return strings.Join([]string{
 		fmt.Sprintf("echo \"[tunnel] start requested $(date -Iseconds), name=%s\" >> %s", safeName, tunnelLogPath),
+		fmt.Sprintf("echo \"[tunnel] starting as user: $(id -un)\" >> %s", tunnelLogPath),
 		fmt.Sprintf("echo \"[tunnel] code path: $(command -v code || echo missing)\" >> %s", tunnelLogPath),
-		fmt.Sprintf("HOME=/root VSCODE_CLI_DATA_DIR=/root/.vscode code tunnel --accept-server-license-terms --name %s >> %s 2>&1", safeName, tunnelLogPath),
+		fmt.Sprintf("mkdir -p %s", safeDataDir),
+		fmt.Sprintf("HOME=%s VSCODE_CLI_DATA_DIR=%s code tunnel --accept-server-license-terms --name %s >> %s 2>&1", safeHome, safeDataDir, safeName, tunnelLogPath),
 		fmt.Sprintf("rc=$?; echo \"[tunnel] process exited with code $rc at $(date -Iseconds)\" >> %s; exit $rc", tunnelLogPath),
 	}, "; ")
 }

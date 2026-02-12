@@ -20,6 +20,7 @@ import (
 const (
 	defaultWorkspaceImage   = "docker.io/library/ubuntu:latest"
 	defaultWorkspaceCommand = "while true; do sleep 3600; done"
+	defaultVSCodeMountPath  = "/root/.vscode"
 
 	workspaceCreateFailedMessage = "Failed to create workspace container."
 	workspaceStartFailedMessage  = "Failed to start workspace container."
@@ -121,7 +122,11 @@ func (s *podmanService) createWorkspace(userID string, payload createWorkspacePa
 	if err != nil {
 		return nil, err
 	}
-	vscodeMountArg := formatWorkspaceVSCodeMountArg(volumeHostPath)
+	vscodeMountTarget := defaultVSCodeMountPath
+	if resolvedPath, resolveErr := resolveWorkspaceVSCodeMountTarget(defaultWorkspaceImage); resolveErr == nil && strings.TrimSpace(resolvedPath) != "" {
+		vscodeMountTarget = resolvedPath
+	}
+	vscodeMountArg := formatWorkspaceVSCodeMountArg(volumeHostPath, vscodeMountTarget)
 
 	args := []string{"create", "--pull=missing"}
 	if payload.Name != "" {
@@ -213,9 +218,33 @@ func ensureWorkspaceVSCodeVolumePath(userID string) (string, error) {
 	return absolutePath, nil
 }
 
-func formatWorkspaceVSCodeMountArg(volumeHostPath string) string {
+func formatWorkspaceVSCodeMountArg(volumeHostPath string, mountTarget string) string {
 	normalizedHostPath := filepath.ToSlash(strings.TrimSpace(volumeHostPath))
-	return fmt.Sprintf("type=bind,src=%s,dst=/root/.vscode", normalizedHostPath)
+	target := strings.TrimSpace(mountTarget)
+	if target == "" {
+		target = defaultVSCodeMountPath
+	}
+	return fmt.Sprintf("type=bind,src=%s,dst=%s", normalizedHostPath, target)
+}
+
+func resolveWorkspaceVSCodeMountTarget(imageRef string) (string, error) {
+	output, err := runPodmanCommand("run", "--rm", "--entrypoint", "sh", imageRef, "-lc", "cat /etc/passwd 2>/dev/null || true")
+	if err != nil {
+		return "", err
+	}
+	return deriveWorkspaceVSCodeMountTargetFromPasswd(string(output)), nil
+}
+
+func deriveWorkspaceVSCodeMountTargetFromPasswd(passwdContents string) string {
+	_, home, ok := selectFirstNonRootUser(passwdContents)
+	if !ok {
+		return defaultVSCodeMountPath
+	}
+	trimmedHome := strings.TrimSpace(home)
+	if trimmedHome == "" {
+		return defaultVSCodeMountPath
+	}
+	return strings.TrimRight(trimmedHome, "/") + "/.vscode"
 }
 
 func validateCreateWorkspacePayload(payload *createWorkspacePayload) error {

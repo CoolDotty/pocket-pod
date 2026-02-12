@@ -113,12 +113,70 @@ func TestEnrichContainersWithTunnelState(t *testing.T) {
 }
 
 func TestBuildTunnelStartCommand(t *testing.T) {
-	cmd := buildTunnelStartCommand("my-workspace")
+	cmd := buildTunnelStartCommand("my-workspace", "/home/dev")
 	if !strings.Contains(cmd, "code tunnel --accept-server-license-terms --name 'my-workspace'") {
 		t.Fatalf("unexpected command: %s", cmd)
 	}
 	if !strings.Contains(cmd, tunnelLogPath) {
 		t.Fatalf("expected tunnel log path in command: %s", cmd)
+	}
+	if !strings.Contains(cmd, "HOME='/home/dev'") {
+		t.Fatalf("expected HOME assignment in command: %s", cmd)
+	}
+}
+
+func TestSelectFirstNonRootUserPrefersRegularHomeUser(t *testing.T) {
+	passwd := strings.Join([]string{
+		"root:x:0:0:root:/root:/bin/bash",
+		"daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin",
+		"ubuntu:x:1000:1000:ubuntu:/home/ubuntu:/bin/bash",
+	}, "\n")
+
+	name, home, ok := selectFirstNonRootUser(passwd)
+	if !ok {
+		t.Fatal("expected user to be selected")
+	}
+	if name != "ubuntu" {
+		t.Fatalf("expected ubuntu user, got %q", name)
+	}
+	if home != "/home/ubuntu" {
+		t.Fatalf("expected ubuntu home, got %q", home)
+	}
+}
+
+func TestSelectFirstNonRootUserFallsBackToFirstNonRoot(t *testing.T) {
+	passwd := strings.Join([]string{
+		"root:x:0:0:root:/root:/bin/bash",
+		"daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin",
+		"nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin",
+	}, "\n")
+
+	name, home, ok := selectFirstNonRootUser(passwd)
+	if !ok {
+		t.Fatal("expected fallback user to be selected")
+	}
+	if name != "daemon" {
+		t.Fatalf("expected daemon fallback user, got %q", name)
+	}
+	if home != "/usr/sbin" {
+		t.Fatalf("expected daemon home fallback, got %q", home)
+	}
+}
+
+func TestSelectFirstNonRootUserReturnsFalseWhenOnlyRootExists(t *testing.T) {
+	name, home, ok := selectFirstNonRootUser("root:x:0:0:root:/root:/bin/bash")
+	if ok {
+		t.Fatalf("expected no user selection, got %q %q", name, home)
+	}
+}
+
+func TestBuildTunnelLogPrepareCommandIncludesChownForExecUser(t *testing.T) {
+	cmd := buildTunnelLogPrepareCommand("ubuntu")
+	if !strings.Contains(cmd, "chown 'ubuntu' "+tunnelLogPath) {
+		t.Fatalf("expected chown to tunnel log path: %s", cmd)
+	}
+	if !strings.Contains(cmd, tunnelBootstrapLogPath) {
+		t.Fatalf("expected bootstrap log path in command: %s", cmd)
 	}
 }
 
