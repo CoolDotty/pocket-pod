@@ -1,4 +1,4 @@
-This app is lets a developer run and manage dev environments in the cloud using containers.
+This app lets a developer run and manage dev environments in the cloud using containers.
 
 make sure you run `npm run lint` when finalizing changes
 
@@ -12,7 +12,15 @@ make sure you run `npm run lint` when finalizing changes
 |   |-- cookies.go        HttpOnly cookie management + env-based config
 |   |-- types.go          Payload structs, collection/role constants, sentinel errors
 |   |-- routes.go         Cookie-to-header middleware + SPA static file serving
-|   |-- assets.go         Embeds web/dist/ into the binary via go:embed
+|   |-- assets.go         Asset loader contract
+|   |-- assets_embed.go   Production asset embed via go:embed (web/dist)
+|   |-- assets_dev.go     Dev asset loader for local frontend builds
+|   |-- podman.go         Podman service + route registration for workspace APIs
+|   |-- podman_actions.go Pod/container action implementations
+|   |-- podman_parse.go   Podman CLI output parsing helpers
+|   |-- podman_poller.go  Background poller for workspace/container status
+|   |-- podman_workspace.go Workspace lifecycle and state helpers
+|   |-- *_test.go         Unit tests for podman actions/poller/workspace
 |   |-- migrations/
 |   |   \-- 20260210_auth.go   Creates users (auth) + invites collections
 |   \-- web/dist/         Frontend build output embedded in the Go binary
@@ -27,6 +35,8 @@ make sure you run `npm run lint` when finalizing changes
 
 The server is a single Go binary powered by PocketBase. It embeds the frontend
 build at compile time (`go:embed`) and serves it as an SPA with fallback routing.
+In addition to auth routes, it exposes Podman-backed APIs for creating and
+managing containerized dev workspaces.
 
 ## Auth Flow
 
@@ -56,7 +66,7 @@ build at compile time (`go:embed`) and serves it as an SPA with fallback routing
 web/
 |-- public/               Static public assets
 |-- src/
-|   |-- api/              PocketBase client + auth queries/mutations
+|   |-- api/              PocketBase client + auth + podman queries/mutations/streaming
 |   |-- components/       Shared UI + route guards
 |   |-- context/          React context providers (Auth)
 |   |-- hooks/            Reusable hooks (auth error handling)
@@ -71,6 +81,7 @@ web/
 |   |-- index.css         Global styles
 |   \-- vite-env.d.ts     Vite type declarations
 |-- index.html            Vite HTML entry
+|-- eslint.config.js      Frontend ESLint config
 |-- package.json          Frontend dependencies and scripts
 |-- tsconfig.json         Frontend TypeScript config
 |-- tsconfig.node.json    Vite config TS support
