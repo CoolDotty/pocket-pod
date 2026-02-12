@@ -34,6 +34,21 @@ const (
 	podmanWriteTimeout      = 5 * time.Second
 )
 
+var podmanStreamEventAllowlist = map[string]struct{}{
+	"create":  {},
+	"start":   {},
+	"stop":    {},
+	"exited":  {},
+	"died":    {},
+	"restart": {},
+	"kill":    {},
+	"remove":  {},
+	"rename":  {},
+	"pause":   {},
+	"unpause": {},
+	"update":  {},
+}
+
 type podmanContainer struct {
 	ID          string            `json:"id"`
 	Name        string            `json:"name"`
