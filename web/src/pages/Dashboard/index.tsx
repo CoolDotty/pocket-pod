@@ -37,7 +37,6 @@ export default function DashboardPage() {
   >(null);
   const [repoUrl, setRepoUrl] = useState("");
   const [workspaceName, setWorkspaceName] = useState("");
-  const [autoStart, setAutoStart] = useState(true);
   const { user, setUser } = useAuth();
   const { getLogoutErrorMessage } = useAuthError(setError);
   const { streamError } = usePodmanContainersStream(Boolean(user));
@@ -118,7 +117,6 @@ export default function DashboardPage() {
               repoUrl: string;
               name?: string;
               ref?: string;
-              autoStart?: boolean;
             } = {
               repoUrl: repoUrl.trim(),
             };
@@ -126,10 +124,6 @@ export default function DashboardPage() {
             const trimmedName = workspaceName.trim();
             if (trimmedName) {
               payload.name = trimmedName;
-            }
-
-            if (!autoStart) {
-              payload.autoStart = false;
             }
 
             try {
@@ -157,14 +151,6 @@ export default function DashboardPage() {
               onChange={(event) => setWorkspaceName(event.target.value)}
               placeholder="my-workspace"
             />
-          </label>
-          <label className={styles.checkbox}>
-            <input
-              type="checkbox"
-              checked={autoStart}
-              onChange={(event) => setAutoStart(event.target.checked)}
-            />
-            Auto start container
           </label>
           <div className={styles.workspaceActions}>
             <button className="button" type="submit" disabled={creatingWorkspace}>

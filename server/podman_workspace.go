@@ -38,11 +38,10 @@ var (
 )
 
 type createWorkspacePayload struct {
-	RepoURL   string            `json:"repoUrl"`
-	Name      string            `json:"name"`
-	Ref       string            `json:"ref"`
-	Env       map[string]string `json:"env"`
-	AutoStart *bool             `json:"autoStart"`
+	RepoURL string            `json:"repoUrl"`
+	Name    string            `json:"name"`
+	Ref     string            `json:"ref"`
+	Env     map[string]string `json:"env"`
 }
 
 type createWorkspaceResponse struct {
@@ -114,8 +113,6 @@ func (s *podmanService) createWorkspace(payload createWorkspacePayload) (*create
 		return nil, errPodmanUnavailable
 	}
 
-	autoStart := payload.AutoStart == nil || *payload.AutoStart
-
 	args := []string{"create", "--pull=missing"}
 	if payload.Name != "" {
 		args = append(args, "--name", payload.Name)
@@ -151,11 +148,9 @@ func (s *podmanService) createWorkspace(payload createWorkspacePayload) (*create
 		return nil, errors.New("empty container id")
 	}
 
-	if autoStart {
-		startCmd := exec.Command("podman", "start", containerID)
-		if _, err := startCmd.CombinedOutput(); err != nil {
-			return nil, fmt.Errorf("%w: %v", errWorkspaceStartFailed, err)
-		}
+	startCmd := exec.Command("podman", "start", containerID)
+	if _, err := startCmd.CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("%w: %v", errWorkspaceStartFailed, err)
 	}
 
 	name, status := inspectCreatedContainer(containerID)
@@ -167,11 +162,7 @@ func (s *podmanService) createWorkspace(payload createWorkspacePayload) (*create
 		}
 	}
 	if status == "" {
-		if autoStart {
-			status = "Running"
-		} else {
-			status = "Created"
-		}
+		status = "Running"
 	}
 
 	s.schedulePoll(podmanPollDebounce)

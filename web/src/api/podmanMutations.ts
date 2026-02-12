@@ -6,7 +6,6 @@ export type CreateWorkspacePayload = {
   repoUrl: string;
   name?: string;
   ref?: string;
-  autoStart?: boolean;
 };
 
 export type CreateWorkspaceResponse = {
